@@ -429,4 +429,53 @@ class JobManager
     {
         return $this->registry->getManagerForClass(Job::class);
     }
+
+    /**
+     * @param $excludedIds
+     * @param $excludedQueues
+     * @param $restrictedQueues
+     * @return Job[]
+     * @throws \Exception
+     */
+    public function findPendingJobs($excludedIds, $excludedQueues, $restrictedQueues)
+    {
+        $qb = $this->getJobManager()->createQueryBuilder();
+
+        $qb->select('j')
+            ->from('JMSJobQueueBundle:Job', 'j')
+            ->orderBy('j.priority', 'ASC')
+            ->addOrderBy('j.id', 'ASC')
+            ->where('j.state = :state')
+            ->setParameter('state', Job::STATE_PENDING)
+        ;
+
+        $conditions = array();
+
+        $conditions[] = $qb->expr()->isNull('j.workerName');
+
+        $conditions[] = $qb->expr()->lt('j.executeAfter', ':now');
+        $qb->setParameter(':now', new \DateTime(), 'datetime');
+
+        $conditions[] = $qb->expr()->eq('j.state', ':state');
+        $qb->setParameter('state', Job::STATE_PENDING);
+
+        if ( ! empty($excludedIds)) {
+            $conditions[] = $qb->expr()->notIn('j.id', ':excludedIds');
+            $qb->setParameter('excludedIds', $excludedIds, Connection::PARAM_INT_ARRAY);
+        }
+
+        if ( ! empty($excludedQueues)) {
+            $conditions[] = $qb->expr()->notIn('j.queue', ':excludedQueues');
+            $qb->setParameter('excludedQueues', $excludedQueues, Connection::PARAM_STR_ARRAY);
+        }
+
+        if ( ! empty($restrictedQueues)) {
+            $conditions[] = $qb->expr()->in('j.queue', ':restrictedQueues');
+            $qb->setParameter('restrictedQueues', $restrictedQueues, Connection::PARAM_STR_ARRAY);
+        }
+
+        $qb->where(call_user_func_array(array($qb->expr(), 'andX'), $conditions));
+
+        return $qb->getQuery()->getResult();
+    }
 }

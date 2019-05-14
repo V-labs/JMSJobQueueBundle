@@ -193,21 +193,26 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
     private function startJobs($workerName, $idleTime, $maxJobs, array $restrictedQueues, array $queueOptionsDefaults, array $queueOptions)
     {
         $excludedIds = array();
-        while (count($this->runningJobs) < $maxJobs) {
-            $pendingJob = $this->getJobManager()->findStartableJob(
-                $workerName,
-                $excludedIds,
-                $this->getExcludedQueues($queueOptionsDefaults, $queueOptions, $maxJobs),
-                $restrictedQueues
-            );
 
-            if (null === $pendingJob) {
-                sleep($idleTime);
+        $filteredJobs = [];
 
-                return;
+        $jobs = $this->getJobManager()->findPendingJobs($excludedIds, $this->getExcludedQueues($queueOptionsDefaults, $queueOptions, $maxJobs), $restrictedQueues);
+
+        /** @var Job $job */
+        foreach ($jobs as $job) {
+            $filteredJobs[$job->getQueue()] = $job;
+        }
+
+        /**
+         * @var int $key
+         * @var Job $filteredJob
+         */
+        foreach ($filteredJobs as $key => $filteredJob) {
+            $runningJobs = $this->getRunningJobsPerQueue();
+            if (($runningJobs[$job->getQueue()] ?? 0) < $maxJobs) {
+                $excludedIds[] = $filteredJob->getId();
+                $this->startJob($filteredJob);
             }
-
-            $this->startJob($pendingJob);
         }
     }
 
