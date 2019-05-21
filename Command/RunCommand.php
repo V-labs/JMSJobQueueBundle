@@ -66,6 +66,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             ->addOption('idle-time', null, InputOption::VALUE_REQUIRED, 'Time to sleep when the queue ran out of jobs.', 2)
             ->addOption('queue', null, InputOption::VALUE_OPTIONAL | InputOption::VALUE_IS_ARRAY, 'Restrict to one or more queues.', array())
             ->addOption('worker-name', null, InputOption::VALUE_REQUIRED, 'The name that uniquely identifies this worker process.')
+            ->addOption('dynamic-queue', null, InputOption::VALUE_REQUIRED, 'The name of the queue to execute')
         ;
     }
 
@@ -93,6 +94,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         }
 
         $restrictedQueues = $input->getOption('queue');
+        $dynamicQueue = $input->getOption('dynamic-queue');
 
         $workerName = $input->getOption('worker-name');
         if ($workerName === null) {
@@ -128,11 +130,12 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             $maxJobs,
             $restrictedQueues,
             $this->getContainer()->getParameter('jms_job_queue.queue_options_defaults'),
-            $this->getContainer()->getParameter('jms_job_queue.queue_options')
+            $this->getContainer()->getParameter('jms_job_queue.queue_options'),
+            $dynamicQueue
         );
     }
 
-    private function runJobs($workerName, $startTime, $maxRuntime, $idleTime, $maxJobs, array $restrictedQueues, array $queueOptionsDefaults, array $queueOptions)
+    private function runJobs($workerName, $startTime, $maxRuntime, $idleTime, $maxJobs, array $restrictedQueues, array $queueOptionsDefaults, array $queueOptions, string $dynamicQueue)
     {
         $hasPcntl = extension_loaded('pcntl');
 
@@ -159,7 +162,7 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
             }
 
             $this->checkRunningJobs();
-            $this->startJobs($workerName, $idleTime, $maxJobs, $restrictedQueues, $queueOptionsDefaults, $queueOptions);
+            $this->startJobs($workerName, $idleTime, $maxJobs, $restrictedQueues, $queueOptionsDefaults, $queueOptions, $dynamicQueue);
 
             $waitTimeInMs = mt_rand(500, 1000);
             usleep($waitTimeInMs * 1E3);
@@ -190,17 +193,17 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
         });
     }
 
-    private function startJobs($workerName, $idleTime, $maxJobs, array $restrictedQueues, array $queueOptionsDefaults, array $queueOptions)
+    private function startJobs($workerName, $idleTime, $maxJobs, array $restrictedQueues, array $queueOptionsDefaults, array $queueOptions, string $dynamicQueue)
     {
         $excludedIds = array();
 
         $filteredJobs = [];
 
-        $jobs = $this->getJobManager()->findPendingJobs($excludedIds, $this->getExcludedQueues($queueOptionsDefaults, $queueOptions, $maxJobs), $restrictedQueues);
+        $jobs = $this->getJobManager()->findPendingJobs($excludedIds, $this->getExcludedQueues($queueOptionsDefaults, $queueOptions, $maxJobs), $restrictedQueues, $dynamicQueue);
 
         /** @var Job $job */
         foreach ($jobs as $job) {
-            $filteredJobs[$job->getQueue()] = $job;
+            $filteredJobs[$job->getQueue()][] = $job;
         }
 
         /**
@@ -208,10 +211,12 @@ class RunCommand extends \Symfony\Bundle\FrameworkBundle\Command\ContainerAwareC
          * @var Job $filteredJob
          */
         foreach ($filteredJobs as $key => $filteredJob) {
-            $runningJobs = $this->getRunningJobsPerQueue();
-            if (($runningJobs[$job->getQueue()] ?? 0) < $maxJobs) {
-                $excludedIds[] = $filteredJob->getId();
-                $this->startJob($filteredJob);
+            foreach ($filteredJob as $job) {
+                $runningJobs = $this->getRunningJobsPerQueue();
+                if (($runningJobs[$key] ?? 0) < $maxJobs) {
+                    $excludedIds[] = $job->getId();
+                    $this->startJob($job);
+                }
             }
         }
     }
