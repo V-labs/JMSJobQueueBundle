@@ -474,8 +474,8 @@ class JobManager
             $qb->setParameter('restrictedQueues', $restrictedQueues, Connection::PARAM_STR_ARRAY);
         }
 
-        $conditions[] = $qb->expr()->like('j.queue', ':dynamicQueue%');
-        $qb->setParameter('dynamicQueue', $dynamicQueue);
+        $conditions[] = $qb->expr()->like('j.queue', ':dynamicQueue');
+        $qb->setParameter('dynamicQueue', $dynamicQueue . '%');
 
         $qb->where(call_user_func_array(array($qb->expr(), 'andX'), $conditions));
 
