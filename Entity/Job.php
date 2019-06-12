@@ -170,6 +170,9 @@ class Job
     /** @ORM\Column(type = "integer", name="memoryUsageReal", nullable = true, options = {"unsigned": true}) */
     private $memoryUsageReal;
 
+    /** @ORM\Column(type = "integer", name="thematic_id", nullable = true) */
+    private $thematicId;
+
     /**
      * This may store any entities which are related to this job, and are
      * managed by Doctrine.
@@ -178,9 +181,9 @@ class Job
      */
     private $relatedEntities;
 
-    public static function create($command, array $args = array(), $confirmed = true, $queue = self::DEFAULT_QUEUE, $priority = self::PRIORITY_DEFAULT)
+    public static function create($command, array $args = array(), $confirmed = true, $queue = self::DEFAULT_QUEUE, $priority = self::PRIORITY_DEFAULT, $thematicId = null)
     {
-        return new self($command, $args, $confirmed, $queue, $priority);
+        return new self($command, $args, $confirmed, $queue, $priority, $thematicId);
     }
 
     public static function isNonSuccessfulFinalState($state)
@@ -202,7 +205,7 @@ class Job
         );
     }
 
-    public function __construct($command, array $args = array(), $confirmed = true, $queue = self::DEFAULT_QUEUE, $priority = self::PRIORITY_DEFAULT)
+    public function __construct($command, array $args = array(), $confirmed = true, $queue = self::DEFAULT_QUEUE, $priority = self::PRIORITY_DEFAULT, $thematicId = null)
     {
         if (trim($queue) === '') {
             throw new \InvalidArgumentException('$queue must not be empty.');
@@ -216,6 +219,7 @@ class Job
         $this->state = $confirmed ? self::STATE_PENDING : self::STATE_NEW;
         $this->queue = $queue;
         $this->priority = $priority * -1;
+        $this->thematicId = $thematicId;
         $this->createdAt = new \DateTime();
         $this->executeAfter = new \DateTime();
         $this->executeAfter = $this->executeAfter->modify('-1 second');
@@ -638,6 +642,25 @@ class Job
     public function isIncomplete()
     {
         return self::STATE_INCOMPLETE === $this->state;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getThematicId()
+    {
+        return $this->thematicId;
+    }
+
+    /**
+     * @param mixed $thematicId
+     * @return Job
+     */
+    public function setThematicId($thematicId)
+    {
+        $this->thematicId = $thematicId;
+
+        return $this;
     }
 
     public function __toString()
