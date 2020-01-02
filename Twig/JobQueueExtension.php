@@ -2,51 +2,64 @@
 
 namespace JMS\JobQueueBundle\Twig;
 
-class JobQueueExtension extends \Twig_Extension
-{
-    private $linkGenerators = array();
+use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
+use Twig\TwigFunction;
+use Twig\TwigTest;
 
-    public function __construct(array $generators = array())
+class JobQueueExtension extends AbstractExtension
+{
+    /**
+     * @var array
+     */
+    private $linkGenerators = [];
+
+    /**
+     * JobQueueExtension constructor.
+     *
+     * @param array $generators
+     */
+    public function __construct(array $generators = [])
     {
         $this->linkGenerators = $generators;
     }
 
     public function getTests()
     {
-        return array(
-            new \Twig_SimpleTest('jms_job_queue_linkable', array($this, 'isLinkable'))
-        );
+        return [
+            new TwigTest('jms_job_queue_linkable', [$this, 'isLinkable'])
+        ];
     }
 
     public function getFunctions()
     {
-        return array(
-            new \Twig_SimpleFunction('jms_job_queue_path', array($this, 'generatePath'), array('is_safe' => array('html' => true)))
-        );
+        return [
+            new TwigFunction('jms_job_queue_path', [$this, 'generatePath'], ['is_safe' => ['html' => true]])
+        ];
     }
 
     public function getFilters()
     {
-        return array(
-            new \Twig_SimpleFilter('jms_job_queue_linkname', array($this, 'getLinkname')),
-            new \Twig_SimpleFilter('jms_job_queue_args', array($this, 'formatArgs'))
-        );
+        return [
+            new TwigFilter('jms_job_queue_linkname', [$this, 'getLinkname']),
+            new TwigFilter('jms_job_queue_args', [$this, 'formatArgs'])
+        ];
     }
 
     public function formatArgs(array $args, $maxLength = 60)
     {
-        $str = '';
+        $str   = '';
         $first = true;
         foreach ($args as $arg) {
             $argLength = strlen($arg);
 
-            if ( ! $first) {
+            if (!$first) {
                 $str .= ' ';
             }
             $first = false;
 
             if (strlen($str) + $argLength > $maxLength) {
-                $str .= substr($arg, 0, $maxLength - strlen($str) - 4).'...';
+                $str .= substr($arg, 0, $maxLength - strlen($str) - 4) . '...';
                 break;
             }
 

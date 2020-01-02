@@ -32,7 +32,8 @@
         "symfony/form": "*",
         "symfony/validator": "*",
         "phpunit/phpunit": "^6.0",
-        "symfony/intl": "*"
+        "symfony/intl": "*",
+        "twig/twig": "~2.12|~3.0"
     },
     "suggest": {
         "sensio/framework-extra-bundle": "Required when using the webinterface.",
